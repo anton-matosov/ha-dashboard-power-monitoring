@@ -157,14 +157,19 @@ def statistics_card(
     stat_types: list[str], chart_type: str,
 ) -> dict[str, Any]:
     return {
-        "type": "statistics-graph",
-        "title": title,
-        "entities": entity_rows(config, field),
-        "period": period,
-        "days_to_show": days,
-        "stat_types": stat_types,
-        "chart_type": chart_type,
-        "hide_legend": False,
+        "type": "vertical-stack",
+        "cards": [
+            {"type": "heading", "heading": title, "heading_style": "title"},
+            {
+                "type": "statistics-graph",
+                "entities": entity_rows(config, field),
+                "period": period,
+                "days_to_show": days,
+                "stat_types": stat_types,
+                "chart_type": chart_type,
+                "hide_legend": False,
+            },
+        ],
     }
 
 

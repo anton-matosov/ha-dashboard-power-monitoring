@@ -53,18 +53,30 @@ class DashboardConfigTests(unittest.TestCase):
         self.assertEqual(month_period, {"rolling_window": {"duration": {"days": 31}}})
         self.assertEqual(year_period, {"rolling_window": {"duration": {"days": 365}}})
 
-        self.assertEqual(views["day"]["cards"][2]["period"], "hour")
-        self.assertEqual(views["day"]["cards"][2]["days_to_show"], 1)
-        self.assertEqual(views["month"]["cards"][2]["period"], "day")
-        self.assertEqual(views["month"]["cards"][2]["days_to_show"], 31)
-        self.assertEqual(views["year"]["cards"][2]["period"], "month")
-        self.assertEqual(views["year"]["cards"][2]["days_to_show"], 365)
+        day_graph = views["day"]["cards"][2]["cards"][1]
+        month_graph = views["month"]["cards"][2]["cards"][1]
+        year_graph = views["year"]["cards"][2]["cards"][1]
+        self.assertEqual(day_graph["period"], "hour")
+        self.assertEqual(day_graph["days_to_show"], 1)
+        self.assertEqual(month_graph["period"], "day")
+        self.assertEqual(month_graph["days_to_show"], 31)
+        self.assertEqual(year_graph["period"], "month")
+        self.assertEqual(year_graph["days_to_show"], 365)
 
     def test_energy_graphs_use_change_and_power_graphs_use_mean_and_max(self):
         for view in dashboard_config(VALID)["views"][1:]:
-            power_graph, energy_graph = view["cards"][2:]
+            power_graph, energy_graph = [section["cards"][1] for section in view["cards"][2:]]
             self.assertEqual(power_graph["stat_types"], ["mean", "max"])
             self.assertEqual(energy_graph["stat_types"], ["change"])
+
+    def test_statistics_graphs_use_external_headings_without_history_links(self):
+        for view in dashboard_config(VALID)["views"][1:]:
+            for section in view["cards"][2:]:
+                self.assertEqual(section["type"], "vertical-stack")
+                self.assertEqual(section["cards"][0]["type"], "heading")
+                graph = section["cards"][1]
+                self.assertEqual(graph["type"], "statistics-graph")
+                self.assertNotIn("title", graph)
 
     def test_rejects_duplicate_entities(self):
         invalid = json.loads(json.dumps(VALID))
