@@ -1,0 +1,19 @@
+{
+  "dashboard": {
+    "title": "Power Monitoring",
+    "url_path": "dashboard-power-monitoring",
+    "icon": "mdi:chart-line"
+  },
+  "plugs": [
+    {
+      "name": "Office workstation",
+      "power_entity": "sensor.office_workstation_power",
+      "energy_entity": "sensor.office_workstation_energy"
+    },
+    {
+      "name": "Dishwasher",
+      "power_entity": "sensor.dishwasher_power",
+      "energy_entity": "sensor.dishwasher_energy"
+    }
+  ]
+}
