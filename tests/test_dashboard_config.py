@@ -5,7 +5,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ha_power_dashboard import create, dashboard_config, load_config, rollback
+from ha_power_dashboard import (
+    create,
+    dashboard_config,
+    load_config,
+    rollback,
+    validate_dashboard_styles,
+)
 
 
 VALID = {
@@ -19,6 +25,8 @@ VALID = {
             "name": "Test plug",
             "power_entity": "sensor.test_plug_power",
             "energy_entity": "sensor.test_plug_energy",
+            "color": "#4C78E8",
+            "marker": "🔵",
         }
     ],
 }
@@ -77,6 +85,29 @@ class DashboardConfigTests(unittest.TestCase):
                 graph = section["cards"][1]
                 self.assertEqual(graph["type"], "statistics-graph")
                 self.assertNotIn("title", graph)
+
+    def test_plug_color_and_marker_are_stable_across_all_views(self):
+        generated = dashboard_config(VALID)
+        for view in generated["views"]:
+            serialized = json.dumps(view, ensure_ascii=False)
+            self.assertIn("🔵 Test plug", serialized)
+            self.assertIn('"color": "#4C78E8"', serialized)
+        self.assertEqual(validate_dashboard_styles(generated, VALID), [])
+
+    def test_style_verification_allows_shared_colors(self):
+        config = json.loads(json.dumps(VALID))
+        second = {
+            "name": "Other plug",
+            "power_entity": "sensor.other_plug_power",
+            "energy_entity": "sensor.other_plug_energy",
+            "color": "#4C78E8",
+            "marker": "🔴",
+        }
+        config["plugs"].append(second)
+        self.assertEqual(
+            validate_dashboard_styles(dashboard_config(config), config),
+            [],
+        )
 
     def test_rejects_duplicate_entities(self):
         invalid = json.loads(json.dumps(VALID))

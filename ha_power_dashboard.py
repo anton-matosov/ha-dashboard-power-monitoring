@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from collections import Counter
 import json
 import os
 import re
@@ -16,6 +17,16 @@ import aiohttp
 
 ENTITY_ID_RE = re.compile(r"^[a-z_][a-z0-9_]*\.[a-z0-9_]+$")
 DEFAULT_BACKUP = Path(__file__).with_name("rollback.json")
+DEFAULT_STYLES = [
+    ("#4C78E8", "🔵"),
+    ("#F9C74F", "🟡"),
+    ("#F26B5E", "🔴"),
+    ("#4CC9A6", "🟢"),
+    ("#9B5DE5", "🟣"),
+    ("#F8961E", "🟠"),
+    ("#A47148", "🟤"),
+    ("#B8C0CC", "⚪"),
+]
 
 
 def atomic_write_json(path: Path, data: dict[str, Any]) -> None:
@@ -145,7 +156,14 @@ class HomeAssistantWS:
 
 
 def entity_rows(config: dict[str, Any], field: str) -> list[dict[str, str]]:
-    return [{"entity": plug[field], "name": plug["name"]} for plug in config["plugs"]]
+    return [
+        {
+            "entity": plug[field],
+            "name": plug["name"],
+            "color": plug.get("color", DEFAULT_STYLES[index % len(DEFAULT_STYLES)][0]),
+        }
+        for index, plug in enumerate(config["plugs"])
+    ]
 
 
 def entity_ids(config: dict[str, Any], field: str) -> list[str]:
@@ -186,11 +204,14 @@ def energy_statistic_grid(config: dict[str, Any], title: str, period: dict[str, 
                     {
                         "type": "statistic",
                         "entity": plug["energy_entity"],
-                        "name": plug["name"],
+                        "name": (
+                            f"{plug.get('marker', DEFAULT_STYLES[index % len(DEFAULT_STYLES)][1])} "
+                            f"{plug['name']}"
+                        ),
                         "stat_type": "change",
                         "period": period,
                     }
-                    for plug in config["plugs"]
+                    for index, plug in enumerate(config["plugs"])
                 ],
             },
         ],
@@ -267,6 +288,44 @@ def dashboard_config(config: dict[str, Any]) -> dict[str, Any]:
             build_view(config, "Year", "year", "month", 365, "Monthly statistics covering the latest 365 days."),
         ],
     }
+
+
+def iter_cards(value: Any):
+    """Yield every Lovelace card from nested stacks and grids."""
+    if isinstance(value, dict):
+        if "type" in value:
+            yield value
+        for child in value.values():
+            yield from iter_cards(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from iter_cards(child)
+
+
+def validate_dashboard_styles(saved: dict[str, Any], config: dict[str, Any]) -> list[str]:
+    """Validate markers and graph colors by entity, not by shared color value."""
+    graph_styles: Counter[tuple[str, str | None]] = Counter()
+    statistic_labels: Counter[tuple[str, str | None]] = Counter()
+    for card in iter_cards(saved):
+        if card.get("type") in {"history-graph", "statistics-graph"}:
+            for entity in card.get("entities", []):
+                if isinstance(entity, dict):
+                    graph_styles[(entity.get("entity", ""), entity.get("color"))] += 1
+        elif card.get("type") == "statistic":
+            statistic_labels[(card.get("entity", ""), card.get("name"))] += 1
+
+    failures = []
+    for index, plug in enumerate(config["plugs"]):
+        default_color, default_marker = DEFAULT_STYLES[index % len(DEFAULT_STYLES)]
+        color = plug.get("color", default_color)
+        marker = plug.get("marker", default_marker)
+        if graph_styles[(plug["power_entity"], color)] != 4:
+            failures.append(f"inconsistent power graph color for {plug['name']}")
+        if graph_styles[(plug["energy_entity"], color)] != 3:
+            failures.append(f"inconsistent energy graph color for {plug['name']}")
+        if statistic_labels[(plug["energy_entity"], f"{marker} {plug['name']}")] != 4:
+            failures.append(f"inconsistent consumption marker for {plug['name']}")
+    return failures
 
 
 async def statistics_counts(ha: HomeAssistantWS, config: dict[str, Any], days: int, period: str) -> dict[str, int]:
@@ -362,7 +421,7 @@ async def verify(config: dict[str, Any], _: Path) -> None:
         if not existing:
             raise RuntimeError("Configured dashboard was not found")
         saved = await ha.call("lovelace/config", url_path=dashboard["url_path"])
-        serialized = json.dumps(saved)
+        serialized = json.dumps(saved, ensure_ascii=False)
         failures = []
         if [view.get("path") for view in saved.get("views", [])] != ["hour", "day", "month", "year"]:
             failures.append("unexpected dashboard views")
@@ -375,6 +434,7 @@ async def verify(config: dict[str, Any], _: Path) -> None:
             failures.append("unexpected generic date selector")
         if serialized.count('"columns": 2') != 4:
             failures.append("expected two-column consumption grids")
+        failures.extend(validate_dashboard_styles(saved, config))
         counts = await statistics_counts(ha, config, 365, "month")
         missing_statistics = [entity for entity, count in counts.items() if count == 0]
         if missing_statistics:

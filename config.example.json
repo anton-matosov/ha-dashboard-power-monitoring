@@ -8,12 +8,16 @@
     {
       "name": "Office workstation",
       "power_entity": "sensor.office_workstation_power",
-      "energy_entity": "sensor.office_workstation_energy"
+      "energy_entity": "sensor.office_workstation_energy",
+      "color": "#4C78E8",
+      "marker": "🔵"
     },
     {
       "name": "Dishwasher",
       "power_entity": "sensor.dishwasher_power",
-      "energy_entity": "sensor.dishwasher_energy"
+      "energy_entity": "sensor.dishwasher_energy",
+      "color": "#F9C74F",
+      "marker": "🟡"
     }
   ]
 }

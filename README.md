@@ -31,6 +31,8 @@ $EDITOR config.json
 
 `config.json` is intentionally gitignored because entity IDs can reveal private household details.
 
+Each plug may define `color` and `marker`. The color is applied explicitly to that plug in every power and energy graph; the marker is shown before its name in every **Energy consumed** summary. If omitted, the tool assigns a stable default from its eight-color palette based on plug order. Set both fields explicitly if colors must remain unchanged when the plug list is reordered.
+
 Credentials are read from `HASS_URL` and `HASS_TOKEN`. On a Hermes Agent host, the script can also use the active profile's protected secret scope from `$HERMES_HOME` or `~/.hermes`; it does not print or persist the token.
 
 Do not put tokens in this repository, command arguments, or shell history. Use Hermes credential setup or another purpose-built secret manager.
